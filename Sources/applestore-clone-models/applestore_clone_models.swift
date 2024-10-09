@@ -23,20 +23,18 @@ public enum AuthenticationFlow {
 @MainActor
 public class AuthManager: ObservableObject {
     @Published var name: String = "unkown"
-    
     @Published var email: String = ""
     @Published var password: String = ""
     @Published var confirmPassword: String = ""
-    
     @Published var flow: AuthenticationFlow = .login
-    
     @Published var isValid: Bool  = false
     @Published var authenticationState: AuthenticationState = .unauthenticated
     @Published var errorMessage: String = ""
     @Published var user: User?
     @Published var displayName: String = ""
     @Published var photoURL: URL?
-    @Published var userID: String = ""
+    
+    @Published public var userID: String = ""
     @Published public var itemStore: ItemStore = ItemStore()
     
     init() {
