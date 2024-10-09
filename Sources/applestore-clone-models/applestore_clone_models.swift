@@ -21,16 +21,17 @@ public enum AuthenticationFlow {
 }
 
 @MainActor
-public class AuthManager: ObservableObject {
+open class AuthManager: ObservableObject {
     @Published var flow: AuthenticationFlow = .login
     @Published var authenticationState: AuthenticationState = .unauthenticated
     @Published var errorMessage: String = ""
     
     @Published public var userID: String = ""
-    @Published public var itemStore: ItemStore = ItemStore()
+    @Published public var itemStore: ItemStore
     
     public static let shared = AuthManager()
     private init() {
+        self.itemStore = ItemStore.shared
     }
 }
 
@@ -138,14 +139,13 @@ public struct Order: Codable {
 }
 
 // 고객ID
-struct UserID: Identifiable {
-    var id: UUID = UUID() // 고객 아이디
-    
+public struct UserID: Identifiable {
+    public var id: UUID = UUID() // 고객 아이디
     var order: [Order]
     var profileInfo: ProfileInfo
 }
 // 고객 관리
-struct ProfileInfo: Codable {
+public struct ProfileInfo: Codable {
     var nickname: String               // 닉네임
     var email: String                  // 이메일
     var registrationDate: Date         // 가입날짜
@@ -158,7 +158,7 @@ struct ProfileInfo: Codable {
         return formatter.string(from: registrationDate)
     }
 }
-protocol ItemStoreType {
+public protocol ItemStoreType {
     func addProduct(_ item: Item, userID: String) async
     func updateProducts(_ item: Item) async
     func loadProducts() async
@@ -166,10 +166,11 @@ protocol ItemStoreType {
 }
 
 @MainActor
-public class ItemStore: ObservableObject, ItemStoreType {
+open class ItemStore: ObservableObject, ItemStoreType {
     
     @Published private(set) var items: [Item] = []
-    
+    public static let shared = ItemStore()
+    private init() {}
     public func addProduct(_ item: Item, userID: String) async {
         items.append(item)
         
