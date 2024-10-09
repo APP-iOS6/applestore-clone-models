@@ -29,7 +29,7 @@ public class AuthManager: ObservableObject {
     @Published public var userID: String = ""
     @Published public var itemStore: ItemStore = ItemStore()
     
-    static let shared = AuthManager()
+    public static let shared = AuthManager()
     private init() {
     }
 }
