@@ -28,10 +28,8 @@ open class AuthManager: ObservableObject {
     
     @Published public var userID: String = ""
     @Published public var itemStore: ItemStore
-    
-    public static let shared = AuthManager()
-    private init() {
-        self.itemStore = ItemStore.shared
+    public init() {
+        self.itemStore = ItemStore()
     }
 }
 
@@ -169,7 +167,8 @@ public protocol ItemStoreType {
 open class ItemStore: ObservableObject, ItemStoreType {
     @Published public var items: [Item] = []
     public static let shared = ItemStore()
-    private init() {}
+    public init() {}
+    
     public func addProduct(_ item: Item, userID: String) async {
         items.append(item)
         
@@ -235,6 +234,7 @@ open class ItemStore: ObservableObject, ItemStoreType {
             }
         }
     }
+    
     public func loadProducts() async {
         do{
             let db = Firestore.firestore()
