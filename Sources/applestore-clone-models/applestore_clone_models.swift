@@ -37,7 +37,7 @@ public class AuthManager: ObservableObject {
     @Published var displayName: String = ""
     @Published var photoURL: URL?
     @Published var userID: String = ""
-    @Published var itemStore: ItemStore = ItemStore()
+    @Published public var itemStore: ItemStore = ItemStore()
     
     init() {
 //        registerAuthStateHandler()
@@ -274,7 +274,7 @@ public class ItemStore: ObservableObject, ItemStoreType {
     
     @Published private(set) var items: [Item] = []
     
-    func addProduct(_ item: Item, userID: String) async {
+    public func addProduct(_ item: Item, userID: String) async {
         items.append(item)
         
         do {
@@ -302,7 +302,7 @@ public class ItemStore: ObservableObject, ItemStoreType {
         }
     }
     
-    func updateProducts(_ item: Item) async {
+    public func updateProducts(_ item: Item) async {
         do {
             let db = Firestore.firestore()
             try await db.collection("Item").document("\(item.itemId)").setData([
@@ -339,7 +339,7 @@ public class ItemStore: ObservableObject, ItemStoreType {
             }
         }
     }
-    func loadProducts() async {
+    public func loadProducts() async {
         do{
             let db = Firestore.firestore()
             let snapshots = try await db.collection("Item").getDocuments()
@@ -375,7 +375,7 @@ public class ItemStore: ObservableObject, ItemStoreType {
         }
     }
     // MARK: 상품 삭제
-    func deleteProduct(_ item: Item, userID: String) async {
+    public func deleteProduct(_ item: Item, userID: String) async {
         do {
             let db = Firestore.firestore()
             
@@ -393,7 +393,7 @@ public class ItemStore: ObservableObject, ItemStoreType {
     }
     
     //MARK: 상품 카테고리 필터
-    func filterByCategory(items: [Item], category: String) {
+    public func filterByCategory(items: [Item], category: String) {
         self.items = items.filter { $0.category == category }
     }
 }
