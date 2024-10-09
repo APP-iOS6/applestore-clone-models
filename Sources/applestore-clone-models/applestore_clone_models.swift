@@ -9,19 +9,19 @@ import GoogleSignInSwift
 @preconcurrency import FirebaseAuth
 @preconcurrency import GoogleSignIn
 
-enum AuthenticationState {
+public enum AuthenticationState {
     case unauthenticated
     case authenticating
     case authenticated
 }
 
-enum AuthenticationFlow {
+public enum AuthenticationFlow {
     case login
     case signUp
 }
 
 @MainActor
-class AuthManager: ObservableObject {
+public class AuthManager: ObservableObject {
     @Published var name: String = "unkown"
     
     @Published var email: String = ""
