@@ -143,7 +143,7 @@ enum AuthenticationError: Error {
 }
 
 extension AuthManager {
-    func signInWithGoogle() async -> Bool {
+    public func signInWithGoogle() async -> Bool {
         guard let clientID = FirebaseApp.app()?.options.clientID else {
             fatalError("No client ID found in Firebase configuration")
         }
