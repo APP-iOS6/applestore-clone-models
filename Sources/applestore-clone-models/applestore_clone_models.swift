@@ -167,8 +167,7 @@ public protocol ItemStoreType {
 
 @MainActor
 open class ItemStore: ObservableObject, ItemStoreType {
-    
-    @Published private(set) var items: [Item] = []
+    @Published public var items: [Item] = []
     public static let shared = ItemStore()
     private init() {}
     public func addProduct(_ item: Item, userID: String) async {
