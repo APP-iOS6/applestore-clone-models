@@ -81,15 +81,15 @@ extension AuthManager {
 
 // 제품 관리
 public struct Item: Codable, Sendable {
-    var itemId: String = UUID().uuidString    // 상품ID
-    var name: String        // 상품명
-    var category: String    // 카테고리
-    var price: Int          // 가격
-    var description: String // 상세설명
-    var stockQuantity: Int  // 재고수량
-    var imageURL: String    // 이미지 URL
-    var color: String       // 색상
-    var isAvailable: Bool   // 상품상태(품절, 판매중 / Bool)
+    public var itemId: String = UUID().uuidString    // 상품ID
+    public  var name: String        // 상품명
+    public var category: String    // 카테고리
+    public var price: Int          // 가격
+    public var description: String // 상세설명
+    public var stockQuantity: Int  // 재고수량
+    public var imageURL: String    // 이미지 URL
+    public  var color: String       // 색상
+    public  var isAvailable: Bool   // 상품상태(품절, 판매중 / Bool)
     
     public static let dummyData = Item(itemId: "1", name: "Dummy Item", category: "Dummy Category", price: 1000, description: "Dummy Description", stockQuantity: 10, imageURL: "https://example.com/image.jpg", color: "Dummy Color", isAvailable: true)
     public init(itemId: String, name: String, category: String, price: Int, description: String, stockQuantity: Int, imageURL: String, color: String, isAvailable: Bool) {
