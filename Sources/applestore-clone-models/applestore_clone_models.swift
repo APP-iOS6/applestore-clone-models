@@ -19,17 +19,75 @@ public enum AuthenticationFlow {
     case login
     case signUp
 }
+public enum UserRole {
+    case admin      // 관리자
+    case consumer   // 소비자
+}
 
 @MainActor
 open class AuthManager: ObservableObject {
+    @Published var name: String = "unkown"
+    
+    @Published var email: String = ""
+    @Published var password: String = ""
+    @Published var confirmPassword: String = ""
+    
     @Published var flow: AuthenticationFlow = .login
+    
+    @Published var isValid: Bool  = false
     @Published var authenticationState: AuthenticationState = .unauthenticated
     @Published var errorMessage: String = ""
+    @Published var user: User?
+    @Published var displayName: String = ""
+    @Published var photoURL: URL?
+    @Published var userID: String = ""
+    @Published var itemStore: ItemStore = ItemStore()
     
-    @Published public var userID: String = ""
-    @Published public var itemStore: ItemStore
+    
+    @Published var profileInfo: ProfileInfo = ProfileInfo(nickname: "",  registrationDate: Date(), recentlyViewedProducts: [])
+    @Published var role: UserRole = .consumer
+    
     public init() {
-        self.itemStore = ItemStore()
+        
+    }
+    
+    private var authStateHandler: AuthStateDidChangeListenerHandle?
+    
+    func registerAuthStateHandler() {
+        if authStateHandler == nil {
+            authStateHandler = Auth.auth().addStateDidChangeListener { auth, user in
+                self.user = user
+                self.authenticationState = user == nil ? .unauthenticated : .authenticated
+                self.displayName = user?.displayName ?? ""
+                self.photoURL = user?.photoURL
+                self.email = user?.email ?? "" // 사용자 이메일 설정
+                
+                self.checkUserRole(email: self.email) // 역할 확인
+            }
+        }
+    }
+    
+    //MARK: 관리자, 소비자 확인 함수
+    private func checkUserRole(email: String) {
+        let adminEmail = ["428bbell@gmail.com","tnswhdgkwk@gmail.com"] // 관리자 이메일 넣어야합니당
+        if adminEmail.contains(email) {
+            self.role = .admin
+        } else {
+            self.role = .consumer
+        }
+    }
+}
+
+extension AuthManager {
+    func signOut() {
+        do {
+            try Auth.auth().signOut()
+            self.email = ""
+        }
+        catch {
+            print(error)
+            errorMessage = error.localizedDescription
+        }
     }
 }
 
@@ -38,7 +96,66 @@ enum AuthenticationError: Error {
 }
 
 extension AuthManager {
-    public func signInWithGoogle() async -> Bool {
+    func createProfile(nickname: String) async {
+        do {
+            let profileInfo = ProfileInfo(nickname: "", registrationDate: Date(), recentlyViewedProducts: [])
+            let db = Firestore.firestore()
+            try await db.collection("User").document(email).collection("profileInfo").document("profileDoc").setData([
+                "nickname": nickname,
+                "recentlyViewedProducts": profileInfo.recentlyViewedProducts,
+                "registrationDate": profileInfo.registrationDate,
+            ])
+        } catch {
+            print(error)
+        }
+    }
+    func loadUserProfile(email: String) async {
+        do {
+            let db = Firestore.firestore()
+            let snapshots = try await db.collection("User").document(email).collection("profileInfo").getDocuments()
+            
+            for document in snapshots.documents {
+                let docData = document.data()
+                let nickname: String = email
+                
+                let registrationTimestamp = docData["registrationDate"] as? Timestamp
+                let registrationDate: Date = registrationTimestamp?.dateValue() ?? Date()
+                
+                let recentlyViewedProducts: [String] = docData["recentlyViewedProducts"] as? [String] ?? []
+                
+                self.profileInfo = ProfileInfo(
+                    nickname: nickname,
+                    registrationDate: registrationDate,
+                    recentlyViewedProducts: recentlyViewedProducts
+                )
+            }
+        } catch{
+            print("\(error)")
+        }
+    }
+    
+    func updateUserProfile(nickname: String,recentlyViewedProducts: [String]) async {
+        do {
+            let db = Firestore.firestore()
+            let docRef = db.collection("User").document(email).collection("profileInfo").document("profileDoc")
+            
+            try await docRef.setData([
+                "nickname": nickname,
+                "recentlyViewedProducts": recentlyViewedProducts,
+                "registrationDate": FieldValue.serverTimestamp()
+            ]
+            )
+            
+            self.profileInfo.nickname = email
+            self.profileInfo.recentlyViewedProducts = recentlyViewedProducts
+            print("profile edit!!")
+            
+        } catch {
+            print("\(error)")
+        }
+    }
+    
+    func signInWithGoogle() async -> Bool {
         guard let clientID = FirebaseApp.app()?.options.clientID else {
             fatalError("No client ID found in Firebase configuration")
         }
@@ -49,7 +166,7 @@ extension AuthManager {
               let window = windowScene.windows.first,
               let rootViewController = window.rootViewController else {
             print("There is no root view controller!")
-        
+            
             return false
         }
         
@@ -68,6 +185,11 @@ extension AuthManager {
             print("User \(firebaseUser.uid) signed in with email \(firebaseUser.email ?? "unknown")")
             
             self.userID = firebaseUser.uid
+            
+            self.email = firebaseUser.email ?? ""  // 구글 로그인하면 이메일 설정
+            await loadUserProfile(email: email)
+            
+            await createProfile(nickname: email)
             authenticationState = .authenticated
             return true
         }
@@ -82,14 +204,14 @@ extension AuthManager {
 // 제품 관리
 public struct Item: Codable, Sendable {
     public var itemId: String = UUID().uuidString    // 상품ID
-    public  var name: String        // 상품명
+    public var name: String        // 상품명
     public var category: String    // 카테고리
     public var price: Int          // 가격
     public var description: String // 상세설명
     public var stockQuantity: Int  // 재고수량
     public var imageURL: String    // 이미지 URL
-    public  var color: String       // 색상
-    public  var isAvailable: Bool   // 상품상태(품절, 판매중 / Bool)
+    public var color: String       // 색상
+    public var isAvailable: Bool   // 상품상태(품절, 판매중 / Bool)
     
     public static let dummyData = Item(itemId: "1", name: "Dummy Item", category: "Dummy Category", price: 1000, description: "Dummy Description", stockQuantity: 10, imageURL: "https://example.com/image.jpg", color: "Dummy Color", isAvailable: true)
     public init(itemId: String, name: String, category: String, price: Int, description: String, stockQuantity: Int, imageURL: String, color: String, isAvailable: Bool) {
@@ -120,7 +242,7 @@ public struct Item: Codable, Sendable {
 public struct Order: Codable {
     var trackingNumber: String
     var orderDate: Date                // 주문 날짜
-    var nickname: String               // 닉네임
+//    var nickname: String               // 닉네임
     var shippingAddress: String        // 배송지
     var phoneNumber: String            // 전화번호
     var productName: String            // 상품명
@@ -134,10 +256,11 @@ public struct Order: Codable {
     
     var bankName: String               // 은행명
     var accountNumber: String          // 계좌번호
-    public init(trackingNumber: String, orderDate: Date, nickname: String, shippingAddress: String, phoneNumber: String, productName: String, imageURL: String, color: String, itemId: String, hasAppleCarePlus: Bool, quantity: Int, unitPrice: Int, bankName: String, accountNumber: String) {
+    
+    var isPay: Bool                    // 구매한 상품(True: 구매O, False: 구매X)
+    public init(trackingNumber: String, orderDate: Date, shippingAddress: String, phoneNumber: String, productName: String, imageURL: String, color: String, itemId: String, hasAppleCarePlus: Bool, quantity: Int, unitPrice: Int, bankName: String, accountNumber: String, isPay: Bool) {
         self.trackingNumber = trackingNumber
         self.orderDate = orderDate
-        self.nickname = nickname
         self.shippingAddress = shippingAddress
         self.phoneNumber = phoneNumber
         self.productName = productName
@@ -149,8 +272,9 @@ public struct Order: Codable {
         self.unitPrice = unitPrice
         self.bankName = bankName
         self.accountNumber = accountNumber
+        self.isPay = isPay
     }
-    
+
     // *수량 + 애플 케어가 true라면 기존 가격에서 10% 더함
     var totalPrice: Int {
         let total = (quantity * unitPrice) + ((quantity/10) * quantity)
@@ -164,7 +288,6 @@ public struct Order: Codable {
         return formatter.string(from: orderDate)
     }
 }
-
 // 고객ID
 public struct UserID: Identifiable {
     public var id: UUID = UUID() // 고객 아이디
@@ -179,15 +302,13 @@ public struct UserID: Identifiable {
 // 고객 관리
 public struct ProfileInfo: Codable, Sendable {
     var nickname: String               // 닉네임
-    var email: String                  // 이메일
     var registrationDate: Date         // 가입날짜
     var recentlyViewedProducts: [String] // 최근 본 제품(상품 ID 리스트)
     
-    static let dummyData = ProfileInfo(nickname: "김민수", email: "minsoo@gmail.com", registrationDate: Date(), recentlyViewedProducts: [])
-   
-    public init(nickname: String, email: String, registrationDate: Date, recentlyViewedProducts: [String]) {
+    static let dummyData = ProfileInfo(nickname: "김민수", registrationDate: Date(), recentlyViewedProducts: [])
+    
+    public init(nickname: String, registrationDate: Date, recentlyViewedProducts: [String]) {
         self.nickname = nickname
-        self.email = email
         self.registrationDate = registrationDate
         self.recentlyViewedProducts = recentlyViewedProducts
     }
@@ -332,7 +453,115 @@ open class ItemStore: ObservableObject, ItemStoreType {
     
     //MARK: 상품 카테고리 필터
     public func filterByCategory(items: [Item], category: String) {
-        self.items = items.filter { $0.category == category }
+        Task {
+            if category == "전체" {
+                await loadProducts()
+            } else {
+                await loadProducts()
+                self.items = self.items.filter { $0.category == category }
+            }
+        }
     }
 }
 
+
+@MainActor
+open class OrderStore: ObservableObject {
+    @Published private(set) var orders: [Order] = []
+    public init(){ }
+    func addOrder(_ order: Order, userID: String) async {
+        orders.append(order)
+        
+        do {
+            let db = Firestore.firestore()
+            
+            try await db.collection("User").document(userID).collection("Order").document("\(order.orderDate)").setData([
+                "trackingNumber": order.trackingNumber,
+                "orderDate": Timestamp(date: order.orderDate),
+                "shippingAddress": order.shippingAddress,
+                "phoneNumber": order.phoneNumber,
+                "productName": order.productName,
+                "imageURL": order.imageURL,
+                "color": order.color,
+                "itemId": order.itemId,
+                "hasAppleCarePlus": order.hasAppleCarePlus,
+                "quantity": order.quantity,
+                "unitPrice": order.unitPrice,
+                "bankName": order.bankName,
+                "accountNumber": order.accountNumber,
+                "isPay": order.isPay
+            ])
+            
+            print("Document successfully written!")
+        } catch {
+            print("Error writing document: \(error)")
+        }
+    }
+    
+    func loadOrder(userID: String) async {
+        do {
+            let db = Firestore.firestore()
+            let snapshots = try await db.collection("User").document(userID).collection("Order").getDocuments()
+            
+            var savedOrders: [Order] = []
+            
+            for document in snapshots.documents {
+                let docData = document.data()
+                let trackingNumber: String = docData["trackingNumber"] as? String ?? ""
+                let orderDate: Date = (docData["orderDate"] as? Timestamp)?.dateValue() ?? Date()
+                let shippingAddress: String = docData["shippingAddress"] as? String ?? ""
+                let phoneNumber: String = docData["phoneNumber"] as? String ?? ""
+                let productName: String = docData["productName"] as? String ?? ""
+                let imageURL: String = docData["imageURL"] as? String ?? ""
+                let color: String = docData["color"] as? String ?? ""
+                let itemId: String = docData["itemId"] as? String ?? ""
+                let hasAppleCarePlus: Bool = docData["hasAppleCarePlus"] as? Bool ?? false
+                let quantity: Int = docData["quantity"] as? Int ?? 0
+                let unitPrice: Int = docData["unitPrice"] as? Int ?? 0
+                let bankName: String = docData["bankName"] as? String ?? ""
+                let accountNumber: String = docData["accountNumber"] as? String ?? ""
+                let isPay: Bool = docData["isPay"] as? Bool ?? false
+                
+                let order = Order(trackingNumber: trackingNumber,
+                                  orderDate: orderDate,
+                                  shippingAddress: shippingAddress,
+                                  phoneNumber: phoneNumber,
+                                  productName: productName,
+                                  imageURL: imageURL,
+                                  color: color,
+                                  itemId: itemId,
+                                  hasAppleCarePlus: hasAppleCarePlus,
+                                  quantity: quantity,
+                                  unitPrice: unitPrice,
+                                  bankName: bankName,
+                                  accountNumber: accountNumber,
+                                  isPay: isPay)
+                
+                savedOrders.append(order)
+                print("Saved Orders: \(savedOrders)")
+            }
+            
+            self.orders = savedOrders
+            print("Orders: \(self.orders)")
+            
+        } catch {
+            print("Error loading orders: \(error)")
+        }
+    }
+    
+    func deleteOrder(_ order: Order, userID: String) async {
+        do {
+            let db = Firestore.firestore()
+            
+            // Firestore에서 해당 주문 삭제
+            try await db.collection("User").document(userID).collection("Order").document("\(order.orderDate)").delete()
+            print("Document successfully removed!")
+            
+            if let index = orders.firstIndex(where: { $0.orderDate == order.orderDate }) {
+                orders.remove(at: index)
+            }
+        } catch {
+            print("Error deleting document: \(error)")
+        }
+    }
+}
